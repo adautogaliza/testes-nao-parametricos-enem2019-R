@@ -1,0 +1,437 @@
+---
+title: Desempenho de escolas públicas, particulares e alunos por raça declarada com testes não paramétricos 
+Author: Adauto de Galiza
+output:
+  html_document: default
+  word_document: default
+  pdf_document: default
+---
+### Teste Mann-Whitney (Não Paramétrico): aplicado quando não há normalidade dos dados, em até duas amostras (amostra = uma mediana a ser testada) independentes tanto para vaiáveis categóricas ordinais quanto para quantiativas (análogo ao teste T).
+
+### Objetivo: verificar se há difenças entre as *medianas* da nota final por escola pública e particular
+
+### Sobre o dataset: a fase de pré-processamen
+
+Carregando pacotes
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+library(dplyr)
+library(RVAideMemoire)
+library(rstatix)
+library(nortest)
+library(ggplot2)
+```
+
+```{r include=FALSE}
+setwd("C:/Users/Adauto/OneDrive/Área de Trabalho/Ciencia de Dados/Estatistica com R Udemy")
+vestibulando_presente <- read.csv("vestibulando_pi_presente.csv", sep = ",")
+```
+Verificando a estrutura do dataset
+```{r}
+head(vestibulando_presente)
+```
+
+
+Filtrando dados apenas com escolas públicas e particulares
+```{r}
+escolas <- vestibulando_presente %>%
+  filter(TP_ESCOLA %in% c("2", "3"))
+
+## renomenado linhas
+
+escolas$TP_ESCOLA[escolas$TP_ESCOLA == 2] <- "Pública" 
+escolas$TP_ESCOLA[escolas$TP_ESCOLA == 3] <- "Particular"
+
+
+## Acicionando coluna com Nota Final:
+
+escolas$NOTA_FINAL <- (escolas$NOTA_CH + escolas$NOTA_CN + escolas$NOTA_MT + escolas$NOTA_LC + escolas$NOTA_REDACAO) / 5
+```
+
+Testando normalidade: o teste Mann-Whitney é recomendado quando os dados não apresentam normalidade
+```{r}
+ad.test(escolas$NOTA_FINAL) # p < 0,05 = não normal
+```
+Aplicando Teste Mann-Wittney
+```{r}
+
+## Ho = As medianas das amostras são iguais quando p > 0,05
+## Ha = Há diferenças entre as medianas analisas quando p < 0,05
+
+wilcox.test(NOTA_FINAL ~ TP_ESCOLA, data= escolas) # as medianas são estatisticamente diferentes
+```
+
+Analise descritiva: agrupando por tipo de escola. Aqui é possível observar que a mediana das escolas particulares (620) é maior que das escolas públicas (480)
+```{r}
+escolas %>% group_by(TP_ESCOLA) %>% get_summary_stats(NOTA_FINAL, type = "median_iqr")
+```
+Analisando graficamente:
+```{r}
+escolas %>% 
+  group_by(TP_ESCOLA) %>%
+    ggplot(aes(x = TP_ESCOLA, y = NOTA_FINAL)) +
+    geom_boxplot(aes(fill = TP_ESCOLA), show.legend = F) +
+    labs(title = "Distribuição da nota final do Enem por tipo de Escola") +
+    xlab("Tipo de Escola") + ylab("Nota Final") +
+    theme_classic()
+
+## Conclusões
+
+## O teste de Mann-Whitney aponta que há diferenças significativas entre as medianas das notas finais entre escolas públicas e particulares, com um intervalo de confiaça de 95%. Em geral, alunos de escolas particulares performam melhor que alunos das escolas públicas
+```
+### Teste Wilcoxom: aplica-se em duas amostras (amostra = uma mediana a ser testada) dependentes entre si, numéricas ou categóricas, tendo mediana como referência e sem normalidade pressuposta (análoga ao teste-T pareado). 
+
+### Objetivo: verificar se há diferenças significativas nas medianas entre as notas dos componentes de redação
+
+Normalidade: necessário criar variável com diferenças para cada par de notas e rodar testes de normalidade com n > 5000 (shapiro apenas 3 > n < 5000):
+```{r}
+escolas$diferenca <- escolas$NOTA_COMP1 - escolas$NOTA_COMP2
+ad.test(escolas$diferenca) 
+escolas$diferenca <- escolas$NOTA_COMP1 - escolas$NOTA_COMP3
+ad.test(escolas$diferenca) 
+escolas$diferenca <- escolas$NOTA_COMP1 - escolas$NOTA_COMP4
+ad.test(escolas$diferenca) 
+escolas$diferenca <- escolas$NOTA_COMP1 - escolas$NOTA_COMP5
+ad.test(escolas$diferenca) 
+escolas$diferenca <- escolas$NOTA_COMP2 - escolas$NOTA_COMP3
+ad.test(escolas$diferenca) 
+escolas$diferenca <- escolas$NOTA_COMP2 - escolas$NOTA_COMP4
+ad.test(escolas$diferenca) 
+escolas$diferenca <- escolas$NOTA_COMP2 - escolas$NOTA_COMP5
+ad.test(escolas$diferenca) 
+escolas$diferenca <- escolas$NOTA_COMP3 - escolas$NOTA_COMP4
+ad.test(escolas$diferenca) 
+escolas$diferenca <- escolas$NOTA_COMP3 - escolas$NOTA_COMP5
+ad.test(escolas$diferenca) 
+escolas$diferenca <- escolas$NOTA_COMP4 - escolas$NOTA_COMP5
+ad.test(escolas$diferenca) 
+
+# Resultado: todos os pares de diferenças são não-normais: aptos para wilcoxon
+```
+
+Aplicando Teste Wilcoxom: neste caso todas as medianas são diferentes entre si para os pares de componetes
+
+```{r}
+## Ho = as medianas não são diferentes entre si : p > 0,05
+## Ha = existem diferenças entre as medianas : p < 0,05
+
+wilcox.test(escolas$NOTA_COMP1, escolas$NOTA_COMP2, paired = T) 
+wilcox.test(escolas$NOTA_COMP1, escolas$NOTA_COMP3, paired = T) 
+wilcox.test(escolas$NOTA_COMP1, escolas$NOTA_COMP4, paired = T) 
+wilcox.test(escolas$NOTA_COMP1, escolas$NOTA_COMP5, paired = T) 
+wilcox.test(escolas$NOTA_COMP2, escolas$NOTA_COMP3, paired = T) 
+wilcox.test(escolas$NOTA_COMP1, escolas$NOTA_COMP4, paired = T) 
+wilcox.test(escolas$NOTA_COMP1, escolas$NOTA_COMP5, paired = T) 
+wilcox.test(escolas$NOTA_COMP3, escolas$NOTA_COMP4, paired = T) 
+wilcox.test(escolas$NOTA_COMP3, escolas$NOTA_COMP5, paired = T) 
+wilcox.test(escolas$NOTA_COMP4, escolas$NOTA_COMP5, paired = T) 
+```
+
+Sumário Descritivo e gráficos
+
+```{r}
+summary(escolas[c("NOTA_COMP1", "NOTA_COMP2", "NOTA_COMP3", "NOTA_COMP4", "NOTA_COMP5")])
+
+par(mfrow=c(1,5))
+boxplot(escolas$NOTA_COMP1, xlab = "Escrita Formal ", ylab = "Nota")
+boxplot(escolas$NOTA_COMP2, xlab = "Adequação ao Tema ", ylab = "Nota")
+boxplot(escolas$NOTA_COMP3, xlab = "Coesão e Coerência ", ylab = "Nota")
+boxplot(escolas$NOTA_COMP4, xlab = "Mecanismos Linguísticos ", ylab = "Nota")
+boxplot(escolas$NOTA_COMP5, xlab = "Pensamento Crítico ", ylab = "Nota")
+
+## Conclusões:
+
+## 1. Apesar das medianas serem próximas em termos absolutos, há signifância estatística no teste de wilcoxon em favor das diferenças entre os componetes das notas, em decorrência das diferentes distribuições interquartis das notas.
+
+## 2. Os componentes 2 (adequação ao tema) e 4 (mecanismos linguísticos) apresentam melhor desempenho entre os alunos do Estado por apresentarem maior distribuição interquartil!
+```
+
+## Teste Kruskal-wallis: aplicado para comparar medianas para mais de duas amostras (quantidade de medianas a serem comparadas). Similiar a Anova.
+
+### Objetivo: verificar se há diferenças das notas finais comparado os grupos por Raça.
+```{r}
+
+## Criando variável de interesse:
+vestibulando_presente$NOTA_FINAL <- (vestibulando_presente$NOTA_CH + vestibulando_presente$NOTA_CN + 
+                                       vestibulando_presente$NOTA_LC + vestibulando_presente$NOTA_MT +
+                                       vestibulando_presente$NOTA_REDACAO) / 5
+
+## Renomeando registros no dataset:
+
+vestibulando_presente$TP_COR_RACA[vestibulando_presente$TP_COR_RACA == 0] <- "ND"
+vestibulando_presente$TP_COR_RACA[vestibulando_presente$TP_COR_RACA == 1] <- "Branca"
+vestibulando_presente$TP_COR_RACA[vestibulando_presente$TP_COR_RACA == 2] <- "Preta"
+vestibulando_presente$TP_COR_RACA[vestibulando_presente$TP_COR_RACA == 3] <- "Parda"
+vestibulando_presente$TP_COR_RACA[vestibulando_presente$TP_COR_RACA == 4] <- "Amarela"
+vestibulando_presente$TP_COR_RACA[vestibulando_presente$TP_COR_RACA == 5] <- "Indígena"
+
+# Verificando resultado
+head(vestibulando_presente$TP_COR_RACA)
+```
+
+Contagem de registros por raça
+```{r}
+vestibulando_presente %>%
+  group_by(TP_COR_RACA) %>%
+  summarise(n())
+```
+Normalidade: no kruskal-wallis a normalidade testada é a dos resíduos : necessidade de construir um modelo para tal.
+```{r}
+## Ho = os resíduos são normais : p > 0,05
+## Ha = resíduos não-normais : p < 0,05
+
+anova <- aov(NOTA_FINAL ~ TP_COR_RACA, data = vestibulando_presente)
+
+lillie.test(anova$residuals) # resíduos não-normais
+```
+
+Teste kruskal-wallis:
+```{r}
+## Ho = as medianas ou distribuição inter-quartil são iguais entre os grupos : p > 0,05
+## Ha = existe pelo menos uma diferença entre as medianas ou distribuição inter-quartil dentro dos grupos : p < 0,05
+
+kruskal.test(NOTA_FINAL ~ TP_COR_RACA, data = vestibulando_presente) # há diferenças significativas das medianas ou da distribuição interquartil
+```
+Teste post-hoc: indicam onde estão as diferenças detectadas pelo kruskal.test(). Teste indicado é o Dunn Teste
+
+```{r}
+dunn_test(NOTA_FINAL ~ TP_COR_RACA, data = vestibulando_presente, p.adjust.method = "bonferroni") # significativo com p < 0,05
+
+## Resultado: Na comparação entre os grupos por Raça, não há significativa diferença apenas entre Amarela vs	Não declarado e Amarela vs Parda
+```
+
+Sumário Descritivo:
+
+```{r}
+vestibulando_presente %>%
+  group_by(TP_COR_RACA) %>%
+  get_summary_stats(NOTA_FINAL, type = "median_iqr") %>%
+  arrange(median)
+```
+
+Graficamente:
+
+```{r}
+# Boxplot
+
+vestibulando_presente %>%
+  ggplot(aes(x = TP_COR_RACA, y = NOTA_FINAL)) +
+  geom_boxplot(aes(fill = TP_COR_RACA), show.legend = F) +
+  labs(title = "Nota final no Enem 2019 por Raça") +
+  xlab("") + ylab("Nota Final") +
+  theme_minimal()
+```
+
+```{r message=FALSE, warning=FALSE}
+# Histograma
+vestibulando_presente %>%
+  ggplot(aes(x = NOTA_FINAL)) +
+  geom_histogram() +
+  facet_wrap(~ TP_COR_RACA) +
+  scale_y_log10()
+
+## Conclusões:
+
+## 1. Os declarados brancos possuem maior desempenho (mediana 516,3) entre os grupos comparados, enquanto os indígenas possuem o pior desempenho (mediana 470,4).
+## 2. As diferenças entre Amarelos (492,8) e Não declarados (494,1) é estatisticamente igual.
+## 3. As diferenças entre Amarelos (492,8) e Pardos (488,9) é estatisticamente igual.
+```
+
+
+### Análise combinada: mesclando teste de mann-whitney com kruskal-wallis
+
+### Objetivo: comparar medianas das notas finais entre raça (mais de duas amostras) e sexo (apenas duas amostras) em todo Estado
+
+Teste Mann-Wittney (para sexo)
+```{r}
+## Ho = As medianas das amostras são iguais quando p > 0,05
+## Ha = Há diferenças entre as medianas analisas quando p < 0,05
+
+## Criando variável de interesse
+
+vestibulando_presente$NOTA_FINAL <- (vestibulando_presente$NOTA_CH + vestibulando_presente$NOTA_CN + 
+                                       vestibulando_presente$NOTA_LC + vestibulando_presente$NOTA_MT +
+                                       vestibulando_presente$NOTA_REDACAO) / 5
+
+wilcox.test(NOTA_FINAL ~ TP_SEXO, data= vestibulando_presente) # há diferenças significativas entre os grupos com p-valor < 0,05
+```
+Analise descritiva: agrupando por sexo declarado
+```{r}
+vestibulando_presente %>% 
+  group_by(TP_SEXO) %>% 
+  get_summary_stats(NOTA_FINAL, type = "median_iqr")
+```
+
+Analisando graficamente
+```{r}
+
+
+vestibulando_presente %>% 
+  group_by(TP_SEXO) %>%
+    ggplot(aes(x = TP_SEXO, y = NOTA_FINAL)) +
+    geom_boxplot(aes(fill = TP_SEXO), show.legend = F) +
+    labs(title = "Distribuição da nota final do Enem por Sexo") +
+    xlab(" ") + ylab("Nota Final") +
+    theme_classic()
+
+## Resultados:
+## 1. O teste de Mann-Whitney aponta que há diferenças significativas entre as medianas das notas finais entre os sexos, com um intervalo de confiaça de 95%.
+
+## 2. A mediana para os homens (500.28) é relativamente maior e estatisticamente maior que a das mulheres (487,48)
+
+```
+Teste kruskal-wallis (para raça)
+```{r}
+## Renomeando registros no dataset:
+
+vestibulando_presente$TP_COR_RACA[vestibulando_presente$TP_COR_RACA == 0] <- "ND"
+vestibulando_presente$TP_COR_RACA[vestibulando_presente$TP_COR_RACA == 1] <- "Branca"
+vestibulando_presente$TP_COR_RACA[vestibulando_presente$TP_COR_RACA == 2] <- "Preta"
+vestibulando_presente$TP_COR_RACA[vestibulando_presente$TP_COR_RACA == 3] <- "Parda"
+vestibulando_presente$TP_COR_RACA[vestibulando_presente$TP_COR_RACA == 4] <- "Amarela"
+vestibulando_presente$TP_COR_RACA[vestibulando_presente$TP_COR_RACA == 5] <- "Indígena"
+
+head(vestibulando_presente$TP_COR_RACA)
+```
+
+```{r}
+## Contagem de registros por raça
+
+vestibulando_presente %>%
+  group_by(TP_COR_RACA) %>%
+  summarise(n())
+```
+Normalidade: no kruskal-wallis a normalidade testada é a dos resíduos: necessidade de construir um modelo para tal.
+```{r}
+
+## Ho = os resíduos são normais : p > 0,05
+## Ha = resíduos não-normais : p < 0,05
+
+anova <- aov(NOTA_FINAL ~ TP_COR_RACA, data = vestibulando_presente)
+
+lillie.test(anova$residuals) # resíduos não-normais
+```
+Aplicando Teste kruskal-wallis
+```{r}
+
+## Ho = as medianas ou distribuição inter-quartil são iguais entre os grupos : p > 0,05
+## Ha = existe pelo menos uma diferença entre as medianas ou distribuição inter-quartil dentro dos grupos : p < 0,05
+
+kruskal.test(NOTA_FINAL ~ TP_COR_RACA, data = vestibulando_presente) # há diferenças significativas das medianas ou da distribuição inter-quartil 
+```
+
+Teste post-hoc: indicam *onde* estão as diferenças detectadas pelo kruskal.test(). Teste indicado é o Dunn Teste
+```{r}
+dunn_test(NOTA_FINAL ~ TP_COR_RACA, data = vestibulando_presente, p.adjust.method = "bonferroni") # significativo com p < 0,05
+
+## Resultado: Na comparação entre os grupos por Raça, não há significativa diferença apenas entre Amarela vs	Não declarado e Amarela vs Parda
+```
+
+Sumário Descritivo
+```{r}
+vestibulando_presente %>%
+  group_by(TP_COR_RACA) %>%
+  get_summary_stats(NOTA_FINAL, type = "median_iqr") %>%
+  arrange(median)
+
+
+## Conclusões:
+
+## 1. Os declarados brancos possuem maior desempenho (mediana 516,3) entre os grupos comparados, enquanto os indígenas possuem o pior desempenho (mediana 470,4).
+## 2. As diferenças entre Amarelos (492,8) e Não declarados (494,1) é estatisticamente igual.
+## 3. As diferenças entre Amarelos (492,8) e Pardos (488,9) é estatisticamente igual.
+```
+
+### Graficamente, podemos fazer uma análise exploratória dos grupos com mais detalhes
+
+Os dados mostram que em geral os candidatos do sexo masculo possuem medianas de notas maiores que os candidatos do sexo feminino para todos os grupos de Raça declarada
+```{r}
+# Boxplot por raça e sexo
+
+g1 <- vestibulando_presente %>%
+  mutate(Sexo = TP_SEXO) %>%
+  ggplot(aes(x = TP_COR_RACA, y = NOTA_FINAL)) +
+  geom_boxplot(aes(fill = Sexo), show.legend = T) +
+  labs(title = "Nota final no Enem 2019 por Raça e Sexo") +
+  xlab("") + ylab("Nota Final") +
+  theme_bw()
+g1
+```
+
+Pelo histograma podemos perceber que o grupo indígena possuiu maior densidade de notas à esquerda do gráfico (menores notas) e o grupo branca maior concentração de notas à direta (maiores notas)
+
+```{r}
+# Histograma de densidade por Raça 
+
+vestibulando_presente %>%
+  mutate(Raça = TP_COR_RACA) %>%
+  ggplot(aes(x = NOTA_FINAL, color = Raça)) +
+  geom_density(show.legend = T) +
+  theme_bw()
+```
+
+Analisando por Sexo é possível perceber uma simetria maior entre os grupos, ainda que Masculino tenha leve concentração de notas à direita maior que o sexo Feminino
+
+```{r}
+# Histograma de densidade por Sexo 
+
+vestibulando_presente %>%
+  mutate(Sexo = TP_SEXO) %>%
+  ggplot(aes(x = NOTA_FINAL, color = Sexo)) +
+  geom_density(show.legend = T) +
+  theme_bw() 
+```
+
+A maior parte dos candidados se autodeclara como pardos e a menor parte se declara como índigena 
+
+```{r}
+# Gráfico de barras com as quantidades de candiatos por Raça
+g2 <- vestibulando_presente %>%
+  group_by(TP_COR_RACA) %>%
+  ggplot(aes(x = TP_COR_RACA, y = (..count..)/sum(..count..), fill = TP_COR_RACA)) + # em "y" função para mostrar %
+  geom_bar(show.legend = F) + 
+  scale_y_continuous(labels = scales::percent_format()) + # comando pacote scales para transformar eixo y em percentual
+  theme_minimal() +
+  scale_fill_manual(values = hcl.colors(n = 6, palette = "Dark2")) + #paletas de cor p/ var. categorica
+  labs(title = "Quantidade de Candidatos por Raça (%)") +
+  xlab(" ") + 
+  ylab(" ")
+g2
+```
+
+A maior parte dos candidatos se declara do Sexo Femino
+
+```{r}
+# Gráfico de barras com as quantidades de candiatos por Sexo 
+g3 <- vestibulando_presente %>%
+  group_by(TP_SEXO) %>%
+  ggplot(aes(x = TP_SEXO, fill = TP_SEXO)) +
+  geom_bar(show.legend = F) + 
+  theme_minimal() +
+  labs(title = "Quantidade de Candidatos por Sexo") +
+  xlab(" ") + 
+  ylab("Quantidade")
+g3
+```
+
+Salvando gráficos
+
+```{r}
+
+ggsave(plot = g1, "Nota final no Enem 2019 por Raça e Sexo.jpeg",  height = 5, width = 6,
+       units = "in", dpi = 600)
+
+ggsave(plot = g2, "Quantidade de Candidatos por Raça.jpeg",  height = 5, width = 6,
+       units = "in", dpi = 600)
+
+ggsave(plot = g3, "Quantidade de Candidatos por Sexo.jpeg",  height = 5, width = 6,
+       units = "in", dpi = 600)
+```
+
+
+
+### Conclusões:
+
+1. O grupo com melhor desempenho é Brancos (mediana 516,35) + Homens (mediana 500,28) com 95% de confiança estatística
+2. O grupo com pior desemepenho é Índigenas (mediana 470,40) + Mulheres (mediana 487,48) com 95% de confiança estatística
+3. Apenas a comparação entre Amarelos vs	Não declarado e Amarelos vs Pardos não apresenta significância estatística.
+
